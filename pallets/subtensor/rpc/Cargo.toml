@@ -17,6 +17,7 @@ codec = { package = "parity-scale-codec", version = "3.0.0", default-features = 
 ] }
 jsonrpsee = { workspace = true, features = ["client-core", "server", "macros"] }
 serde = { workspace = true, features = ["derive"] }
+substrate-fixed = { workspace = true }
 
 # Substrate packages
 sp-api = { workspace = true }
@@ -37,6 +38,7 @@ std = [
 	"subtensor-custom-rpc-runtime-api/std",
 	"pallet-subtensor/std",
 	"codec/std",
-	"serde/std"
+	"serde/std",
+	"substrate-fixed/std"
 ]
 pow-faucet = []

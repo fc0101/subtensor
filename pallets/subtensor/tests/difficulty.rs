@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used)]
-
 use crate::mock::*;
 mod mock;
 use sp_core::U256;

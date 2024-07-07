@@ -8,7 +8,6 @@ use sp_runtime::{
         InvalidTransaction, TransactionLongevity, TransactionValidity, TransactionValidityError,
         ValidTransaction,
     },
-    Saturating,
 };
 use sp_std::vec;
 
@@ -83,7 +82,7 @@ where
             }
             .into());
         }
-        account.nonce.saturating_inc();
+        account.nonce += T::Nonce::one();
         frame_system::Account::<T>::insert(who, account);
         Ok(())
     }
@@ -112,7 +111,7 @@ where
 
         let provides = vec![Encode::encode(&(who, self.0))];
         let requires = if account.nonce < self.0 {
-            vec![Encode::encode(&(who, self.0.saturating_sub(One::one())))]
+            vec![Encode::encode(&(who, self.0 - One::one()))]
         } else {
             vec![]
         };

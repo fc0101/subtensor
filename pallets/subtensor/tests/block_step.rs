@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used)]
-
 mod mock;
 use frame_support::assert_ok;
 use frame_system::Config;
@@ -7,6 +5,7 @@ use mock::*;
 use sp_core::U256;
 
 #[test]
+#[allow(clippy::unwrap_used)]
 fn test_loaded_emission() {
     new_test_ext(1).execute_with(|| {
         let n: u16 = 100;

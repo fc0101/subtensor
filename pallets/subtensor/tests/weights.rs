@@ -1,5 +1,3 @@
-#![allow(clippy::indexing_slicing)]
-
 mod mock;
 use frame_support::{
     assert_err, assert_ok,

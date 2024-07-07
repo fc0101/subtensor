@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used)]
-
 use codec::Encode;
 use frame_support::{assert_ok, traits::InstanceFilter, BoundedVec};
 use node_subtensor_runtime::{
