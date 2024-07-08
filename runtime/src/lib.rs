@@ -1627,7 +1627,7 @@ impl_runtime_apis! {
     }
 
     impl subtensor_custom_rpc_runtime_api::SubtensorEpochRuntimeApi<Block> for Runtime {
-        fn get_subtensor_epoch(netuid: u16, is_incentive: Option<bool>)-> Vec<I32F32> {
+        fn get_subtensor_epoch(netuid: u16, is_incentive: Option<u16>)-> Vec<I32F32> {
             SubtensorModule::subtensor_epoch(netuid, is_incentive).get()
         }
     }

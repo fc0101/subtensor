@@ -24,6 +24,15 @@ impl<T: Config> SubtensorEpochReturnTypeTrait<T> for Vec<I32F32> {
     }
 }
 
+impl<T: Config> SubtensorEpochReturnTypeTrait<T>  for Vec<Vec<(u16, I32F32)>> {
+    fn get(&self) -> Vec<I32F32> {
+        self.into_iter()                      // Create an iterator over the outer vector
+            .flatten()                        // Flatten the nested vectors into a single iterator
+            .map(|(_index, value)| *value)     // Extract the I32F32 value from each tuple
+            .collect()                        // Collect the values into a single vector
+    }
+}
+
 impl<T: Config> Pallet<T> {
     /// Calculates reward consensus and returns the emissions for uids/hotkeys in a given `netuid`.
     /// (Dense version used only for testing purposes.)
@@ -734,9 +743,9 @@ impl<T: Config> Pallet<T> {
     ///     - Print debugging outputs.
     ///
     #[allow(clippy::indexing_slicing)]
-    pub fn subtensor_epoch(netuid: u16, is_incentive: Option<bool>) -> Box<dyn SubtensorEpochReturnTypeTrait<T>> {
+    pub fn subtensor_epoch(netuid: u16, is_incentive: Option<u16>) -> Box<dyn SubtensorEpochReturnTypeTrait<T>> {
         
-        let is_incentive = is_incentive.unwrap_or(false);
+        let is_incentive = is_incentive.unwrap_or(0);
         let rao_emission: u64 = Self::get_emission_value(netuid);
         // Get subnetwork size.
         let n: u16 = Self::get_subnetwork_n(netuid);
@@ -824,6 +833,9 @@ impl<T: Config> Pallet<T> {
 
         // Normalize active stake.
         inplace_normalize(&mut active_stake);
+        if is_incentive == 9 {
+            return Box::new(active_stake) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         log::trace!("S:\n{:?}\n", &active_stake);
 
         // =============
@@ -832,14 +844,26 @@ impl<T: Config> Pallet<T> {
 
         // Access network weights row unnormalized.
         let mut weights: Vec<Vec<(u16, I32F32)>> = Self::get_weights_sparse(netuid);
+
+        if is_incentive == 1 {
+            return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // log::trace!( "W: {:?}", &weights );
 
         // Mask weights that are not from permitted validators.
         weights = mask_rows_sparse(&validator_forbids, &weights);
+        
+        if is_incentive == 2 {
+            return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // log::trace!( "W (permit): {:?}", &weights );
 
         // Remove self-weight by masking diagonal.
         weights = mask_diag_sparse(&weights);
+
+        if is_incentive == 3 {
+            return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // log::trace!( "W (permit+diag): {:?}", &weights );
 
         // Remove weights referring to deregistered neurons.
@@ -849,10 +873,18 @@ impl<T: Config> Pallet<T> {
             &block_at_registration,
             &|updated, registered| updated <= registered,
         );
+        
+        if is_incentive == 4 {
+            return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // log::trace!( "W (permit+diag+outdate): {:?}", &weights );
 
         // Normalize remaining weights.
         inplace_row_normalize_sparse(&mut weights);
+        
+        if is_incentive == 5 {
+            return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // log::trace!( "W (mask+norm): {:?}", &weights );
 
         // ================================
@@ -866,9 +898,16 @@ impl<T: Config> Pallet<T> {
         // Clip weights at majority consensus
         let kappa: I32F32 = Self::get_float_kappa(netuid); // consensus majority ratio, e.g. 51%.
         let consensus: Vec<I32F32> = weighted_median_col_sparse(&active_stake, &weights, n, kappa);
+        if is_incentive == 6 {
+            return Box::new(consensus) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         log::trace!("C: {:?}", &consensus);
 
         weights = col_clip_sparse(&weights, &consensus);
+
+        if is_incentive == 7 {
+            return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // log::trace!( "W: {:?}", &weights );
 
         let validator_trust: Vec<I32F32> = row_sum_sparse(&weights);
@@ -896,6 +935,9 @@ impl<T: Config> Pallet<T> {
 
         // Access network bonds.
         let mut bonds: Vec<Vec<(u16, I32F32)>> = Self::get_bonds_sparse(netuid);
+        if is_incentive == 8 {
+            return Box::new(bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // log::trace!( "B: {:?}", &bonds );
 
         // Remove bonds referring to deregistered neurons.
@@ -906,29 +948,54 @@ impl<T: Config> Pallet<T> {
             &|updated, registered| updated <= registered,
         );
         // log::trace!( "B (outdatedmask): {:?}", &bonds );
-
+        if is_incentive == 17 {
+            return Box::new(bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // Normalize remaining bonds: sum_i b_ij = 1.
         inplace_col_normalize_sparse(&mut bonds, n);
         // log::trace!( "B (mask+norm): {:?}", &bonds );
+
+        if is_incentive == 16 {
+            return Box::new(bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
 
         // Compute bonds delta column normalized.
         let mut bonds_delta: Vec<Vec<(u16, I32F32)>> = row_hadamard_sparse(&weights, &active_stake); // ΔB = W◦S (outdated W masked)
                                                                                                      // log::trace!( "ΔB: {:?}", &bonds_delta );
 
+        if is_incentive == 10 {
+            return Box::new(bonds_delta) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
+
         // Normalize bonds delta.
         inplace_col_normalize_sparse(&mut bonds_delta, n); // sum_i b_ij = 1
                                                            // log::trace!( "ΔB (norm): {:?}", &bonds_delta );
+        if is_incentive == 11 {
+            return Box::new(bonds_delta) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
 
         // Compute bonds moving average.
         let bonds_moving_average: I64F64 =
             I64F64::from_num(Self::get_bonds_moving_average(netuid)) / I64F64::from_num(1_000_000);
         let alpha: I32F32 = I32F32::from_num(1) - I32F32::from_num(bonds_moving_average);
+        if is_incentive == 14 {
+            return Box::new(vec![alpha]) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         let mut ema_bonds: Vec<Vec<(u16, I32F32)>> = mat_ema_sparse(&bonds_delta, &bonds, alpha);
 
+        if is_incentive == 15 {
+            return Box::new(ema_bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
+
+        if is_incentive == 12 {
+            return Box::new(vec![I32F32::from_num(1.0)]) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // Normalize EMA bonds.
         inplace_col_normalize_sparse(&mut ema_bonds, n); // sum_i b_ij = 1
                                                          // log::trace!( "emaB: {:?}", &ema_bonds );
-
+        if is_incentive == 13 {
+            return Box::new(ema_bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         // Compute dividends: d_i = SUM(j) b_ij * inc_j.
         // range: I32F32(0, 1)
         let mut dividends: Vec<I32F32> = matmul_transpose_sparse(&ema_bonds, &incentive);
@@ -1072,22 +1139,22 @@ impl<T: Config> Pallet<T> {
                 }
             });
 
-        if is_incentive {
+        if is_incentive == 0 {
             // Incentive I32F32 as SubtensorEpochReturnTypeTrait
             return Box::new(incentive) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
-        } else {
-            // Emission tuples ( hotkeys, server_emission, validator_emission ) as SubtensorEpochReturnTypeTrait
-            return Box::new(hotkeys
-                .into_iter()
-                .map(|(uid_i, hotkey)| {
-                    (
-                        hotkey,
-                        server_emission[uid_i as usize],
-                        validator_emission[uid_i as usize],
-                    )
-                })
-                .collect::<Vec<_>>()) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
+        
+        // Emission tuples ( hotkeys, server_emission, validator_emission ) as SubtensorEpochReturnTypeTrait
+        return Box::new(hotkeys
+            .into_iter()
+            .map(|(uid_i, hotkey)| {
+                (
+                    hotkey,
+                    server_emission[uid_i as usize],
+                    validator_emission[uid_i as usize],
+                )
+            })
+            .collect::<Vec<_>>()) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
     }
 
     pub fn get_float_rho(netuid: u16) -> I32F32 {

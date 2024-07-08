@@ -35,6 +35,6 @@ sp_api::decl_runtime_apis! {
     }
 
     pub trait SubtensorEpochRuntimeApi {
-        fn get_subtensor_epoch(netuid: u16, is_incentive: Option<bool>)->Vec<I32F32>;
+        fn get_subtensor_epoch(netuid: u16, is_incentive: Option<u16>)->Vec<I32F32>;
     }
 }

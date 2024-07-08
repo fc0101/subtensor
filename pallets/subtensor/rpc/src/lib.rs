@@ -55,7 +55,7 @@ pub trait SubtensorCustomApi<BlockHash> {
     fn get_network_lock_cost(&self, at: Option<BlockHash>) -> RpcResult<u64>;
 
     #[method(name = "subtensor_epoch")]
-    fn get_subtensor_epoch(&self, netuid: u16, is_incentive: Option<bool>, at:Option<BlockHash>)-> RpcResult<Vec<I32F32>>;
+    fn get_subtensor_epoch(&self, netuid: u16, is_incentive: Option<u16>, at:Option<BlockHash>)-> RpcResult<Vec<I32F32>>;
 
 
 }
@@ -232,7 +232,7 @@ where
         })
     }
 
-    fn get_subtensor_epoch(&self, netuid: u16, is_incentive: Option<bool>, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<I32F32>> {
+    fn get_subtensor_epoch(&self, netuid: u16, is_incentive: Option<u16>, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<I32F32>> {
         let api = self.client.runtime_api();
         let at = at.unwrap_or_else(|| self.client.info().best_hash);
 
