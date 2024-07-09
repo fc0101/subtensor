@@ -5,6 +5,8 @@ use sp_std::vec;
 use substrate_fixed::types::{I32F32, I64F64, I96F32};
 use alloc::boxed::Box;
 
+const LOG_TARGET: &str = "log_epoch";
+
 // Define a trait for the return types
 pub trait SubtensorEpochReturnTypeTrait<T> {
     // This function will be implemented differently for each return type
@@ -32,7 +34,6 @@ impl<T: Config> SubtensorEpochReturnTypeTrait<T>  for Vec<Vec<(u16, I32F32)>> {
             .collect()                        // Collect the values into a single vector
     }
 }
-
 impl<T: Config> Pallet<T> {
     /// Calculates reward consensus and returns the emissions for uids/hotkeys in a given `netuid`.
     /// (Dense version used only for testing purposes.)
@@ -797,6 +798,7 @@ impl<T: Config> Pallet<T> {
         }
         inplace_normalize_64(&mut stake_64);
         let stake: Vec<I32F32> = vec_fixed64_to_fixed32(stake_64);
+        
         // range: I32F32(0, 1)
         log::trace!("S: {:?}", &stake);
 
@@ -806,11 +808,17 @@ impl<T: Config> Pallet<T> {
 
         // Get current validator permits.
         let validator_permits: Vec<bool> = Self::get_validator_permit(netuid);
+        if is_incentive == 21 {
+            log::trace!(target: LOG_TARGET, "validator_permits: {:?}", &validator_permits );
+        }
         log::trace!("validator_permits: {:?}", validator_permits);
 
         // Logical negation of validator_permits.
         let validator_forbids: Vec<bool> = validator_permits.iter().map(|&b| !b).collect();
 
+        if is_incentive == 22 {
+            log::trace!(target: LOG_TARGET, "validator_forbids:\n{:?}\n", &validator_forbids );
+        }
         // Get max allowed validators.
         let max_allowed_validators: u16 = Self::get_max_allowed_validators(netuid);
         log::trace!("max_allowed_validators: {:?}", max_allowed_validators);
@@ -834,6 +842,7 @@ impl<T: Config> Pallet<T> {
         // Normalize active stake.
         inplace_normalize(&mut active_stake);
         if is_incentive == 9 {
+            log::trace!(target: LOG_TARGET, "S:\n{:?}\n", &active_stake );
             return Box::new(active_stake) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         log::trace!("S:\n{:?}\n", &active_stake);
@@ -846,22 +855,24 @@ impl<T: Config> Pallet<T> {
         let mut weights: Vec<Vec<(u16, I32F32)>> = Self::get_weights_sparse(netuid);
 
         if is_incentive == 1 {
+            log::trace!(target: LOG_TARGET, "W: {:?}", &weights );
             return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // log::trace!( "W: {:?}", &weights );
-
         // Mask weights that are not from permitted validators.
         weights = mask_rows_sparse(&validator_forbids, &weights);
         
         if is_incentive == 2 {
+            log::trace!(target: LOG_TARGET, "W (permit): {:?}", &weights );
             return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // log::trace!( "W (permit): {:?}", &weights );
 
         // Remove self-weight by masking diagonal.
         weights = mask_diag_sparse(&weights);
-
+        
         if is_incentive == 3 {
+            log::trace!(target: LOG_TARGET, "W (permit+diag): {:?}", &weights );
             return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // log::trace!( "W (permit+diag): {:?}", &weights );
@@ -874,7 +885,9 @@ impl<T: Config> Pallet<T> {
             &|updated, registered| updated <= registered,
         );
         
+        
         if is_incentive == 4 {
+            log::trace!(target: LOG_TARGET, "W (permit+diag+outdate): {:?}", &weights );
             return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // log::trace!( "W (permit+diag+outdate): {:?}", &weights );
@@ -883,10 +896,10 @@ impl<T: Config> Pallet<T> {
         inplace_row_normalize_sparse(&mut weights);
         
         if is_incentive == 5 {
+            log::trace!(target: LOG_TARGET, "W (mask+norm): {:?}", &weights );
             return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // log::trace!( "W (mask+norm): {:?}", &weights );
-
         // ================================
         // == Consensus, Validator Trust ==
         // ================================
@@ -899,16 +912,17 @@ impl<T: Config> Pallet<T> {
         let kappa: I32F32 = Self::get_float_kappa(netuid); // consensus majority ratio, e.g. 51%.
         let consensus: Vec<I32F32> = weighted_median_col_sparse(&active_stake, &weights, n, kappa);
         if is_incentive == 6 {
+            log::trace!(target: LOG_TARGET, "C: {:?}", &consensus );
             return Box::new(consensus) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
-        log::trace!("C: {:?}", &consensus);
+        // log::trace!("C: {:?}", &consensus);
 
         weights = col_clip_sparse(&weights, &consensus);
 
         if is_incentive == 7 {
+            log::trace!(target: LOG_TARGET, "col_clip_sparse W: {:?}", &weights );
             return Box::new(weights) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
-        // log::trace!( "W: {:?}", &weights );
 
         let validator_trust: Vec<I32F32> = row_sum_sparse(&weights);
         log::trace!("Tv: {:?}", &validator_trust);
@@ -936,6 +950,7 @@ impl<T: Config> Pallet<T> {
         // Access network bonds.
         let mut bonds: Vec<Vec<(u16, I32F32)>> = Self::get_bonds_sparse(netuid);
         if is_incentive == 8 {
+            log::trace!(target: LOG_TARGET, "B: {:?}", &bonds );
             return Box::new(bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // log::trace!( "B: {:?}", &bonds );
@@ -949,6 +964,7 @@ impl<T: Config> Pallet<T> {
         );
         // log::trace!( "B (outdatedmask): {:?}", &bonds );
         if is_incentive == 17 {
+            log::trace!(target: LOG_TARGET, "B (outdatedmask): {:?}", &bonds );
             return Box::new(bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // Normalize remaining bonds: sum_i b_ij = 1.
@@ -956,6 +972,7 @@ impl<T: Config> Pallet<T> {
         // log::trace!( "B (mask+norm): {:?}", &bonds );
 
         if is_incentive == 16 {
+            log::trace!(target: LOG_TARGET, "B (mask+norm): {:?}", &bonds );
             return Box::new(bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
 
@@ -964,6 +981,7 @@ impl<T: Config> Pallet<T> {
                                                                                                      // log::trace!( "ΔB: {:?}", &bonds_delta );
 
         if is_incentive == 10 {
+            log::trace!(target: LOG_TARGET, "ΔB: {:?}", &bonds );
             return Box::new(bonds_delta) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
 
@@ -971,35 +989,45 @@ impl<T: Config> Pallet<T> {
         inplace_col_normalize_sparse(&mut bonds_delta, n); // sum_i b_ij = 1
                                                            // log::trace!( "ΔB (norm): {:?}", &bonds_delta );
         if is_incentive == 11 {
+            log::trace!(target: LOG_TARGET, "ΔB (norm): {:?}", &bonds );
             return Box::new(bonds_delta) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
+
+        // log::trace!(target: LOG_TARGET, "ΔB (norm): {:?}", &bonds_delta );
 
         // Compute bonds moving average.
         let bonds_moving_average: I64F64 =
             I64F64::from_num(Self::get_bonds_moving_average(netuid)) / I64F64::from_num(1_000_000);
         let alpha: I32F32 = I32F32::from_num(1) - I32F32::from_num(bonds_moving_average);
         if is_incentive == 14 {
+            log::trace!(target: LOG_TARGET, "alpha: {:?}", &alpha );
             return Box::new(vec![alpha]) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         let mut ema_bonds: Vec<Vec<(u16, I32F32)>> = mat_ema_sparse(&bonds_delta, &bonds, alpha);
 
         if is_incentive == 15 {
+            log::trace!(target: LOG_TARGET, "ema_bonds: {:?}", &ema_bonds );
             return Box::new(ema_bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
 
-        if is_incentive == 12 {
-            return Box::new(vec![I32F32::from_num(1.0)]) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
-        }
         // Normalize EMA bonds.
         inplace_col_normalize_sparse(&mut ema_bonds, n); // sum_i b_ij = 1
                                                          // log::trace!( "emaB: {:?}", &ema_bonds );
+
+                                                         
         if is_incentive == 13 {
+            log::trace!(target: LOG_TARGET, "emaB: {:?}", &ema_bonds );
             return Box::new(ema_bonds) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
         }
         // Compute dividends: d_i = SUM(j) b_ij * inc_j.
         // range: I32F32(0, 1)
         let mut dividends: Vec<I32F32> = matmul_transpose_sparse(&ema_bonds, &incentive);
         inplace_normalize(&mut dividends);
+        if is_incentive == 20 {
+            log::trace!(target: LOG_TARGET, "D: {:?}", &dividends );
+
+            return Box::new(dividends) as Box<dyn SubtensorEpochReturnTypeTrait<T>>;
+        }
         log::trace!("D: {:?}", &dividends);
 
         // =================================
@@ -1198,7 +1226,7 @@ impl<T: Config> Pallet<T> {
             <Weights<T> as IterableStorageDoubleMap<u16, u16, Vec<(u16, u16)>>>::iter_prefix(netuid)
                 .filter(|(uid_i, _)| *uid_i < n as u16)
         {
-            for (uid_j, weight_ij) in weights_i.iter().filter(|(uid_j, _)| *uid_j < n as u16) {
+            for (uid_j, weight_ij) in weights_i.iter().filter(|(uid_j, _)| *uid_j == 142 as u16) {
                 weights
                     .get_mut(uid_i as usize)
                     .expect("uid_i is filtered to be less than n; qed")
